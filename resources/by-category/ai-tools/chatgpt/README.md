@@ -54,8 +54,8 @@ ChatGPT is the most popular AI chatbot and often the first AI tool people try. T
 ## 💡 Key Features to Know
 
 ### Free vs. Paid (ChatGPT Plus)
-- **Free**: GPT-3.5, basic features, some limitations
-- **Plus ($20/month)**: GPT-4, faster responses, priority access, advanced features
+- **Free**: GPT-4o mini, basic features, some limitations
+- **Plus ($20/month)**: GPT-4.1, GPT-4o, faster responses, priority access, advanced features
 
 ### Important Capabilities
 - **Web Browsing**: Can search the internet for current information

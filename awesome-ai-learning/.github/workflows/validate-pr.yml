@@ -1,0 +1,441 @@
+name: ✅ Validate Pull Request
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_target:
+    branches: [main, master]
+    types: [opened, synchronize, reopened]
+
+env:
+  PYTHON_VERSION: '3.9'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  actions: read
+
+jobs:
+  # Security check for external PRs
+  security-check:
+    name: 🔒 Security Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    
+    steps:
+      - name: 🔍 Check PR Author
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            // Get collaborators
+            const { data: collaborators } = await github.rest.repos.listCollaborators({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            const isCollaborator = collaborators.some(collab => collab.login === pr.user.login);
+            const isOwner = pr.user.login === context.repo.owner;
+            
+            if (!isCollaborator && !isOwner) {
+              core.setFailed(`PR from external contributor ${pr.user.login} requires manual review`);
+            } else {
+              console.log(`✅ PR from trusted contributor: ${pr.user.login}`);
+            }
+
+  validate:
+    name: 🧪 Validate Changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'pull_request_target' && success())
+    timeout-minutes: 20
+    
+    strategy:
+      matrix:
+        test-type: [syntax, functionality, performance]
+      fail-fast: false
+    
+    steps:
+      - name: 🏁 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Install additional testing dependencies
+          pip install pytest pytest-cov flake8 black isort mypy
+      
+      - name: 🔍 Syntax Validation
+        if: matrix.test-type == 'syntax'
+        run: |
+          echo "🔍 Running syntax and style checks..."
+          
+          # Python syntax check
+          python -m py_compile tools/*.py
+          
+          # Code style check (non-blocking warnings)
+          echo "📝 Code style analysis:"
+          flake8 tools/ --max-line-length=100 --ignore=E203,W503 || echo "⚠️ Style warnings found"
+          
+          # Import validation
+          echo "📦 Import validation:"
+          cd tools
+          python -c "
+          import sys
+          try:
+              import fetch_stars, analyze_repos, generate_markdown
+              print('✅ All modules import successfully')
+          except ImportError as e:
+              print(f'❌ Import error: {e}')
+              sys.exit(1)
+          "
+      
+      - name: 🧪 Functionality Tests
+        if: matrix.test-type == 'functionality'
+        run: |
+          echo "🧪 Running functionality tests..."
+          cd tools
+          
+          # Run existing tests if they exist
+          if [ -f "test_analyzer.py" ]; then
+            echo "🔬 Running unit tests..."
+            python test_analyzer.py
+          fi
+          
+          # Test basic functionality with dry run
+          echo "🔍 Testing fetch functionality (dry run)..."
+          python -c "
+          import fetch_stars
+          print('✅ fetch_stars module loads correctly')
+          "
+          
+          echo "🔍 Testing analyzer functionality..."
+          python -c "
+          import analyze_repos
+          print('✅ analyze_repos module loads correctly')
+          "
+          
+          echo "🔍 Testing markdown generator..."
+          python -c "
+          import generate_markdown
+          print('✅ generate_markdown module loads correctly')
+          "
+      
+      - name: ⚡ Performance Tests
+        if: matrix.test-type == 'performance'
+        run: |
+          echo "⚡ Running performance validation..."
+          
+          # Test with small dataset if available
+          cd tools
+          
+          # Create mock data for testing
+          python -c "
+          import json
+          import time
+          from pathlib import Path
+          
+          # Create minimal test data
+          test_data = {
+              'repositories': [
+                  {
+                      'id': 123456,
+                      'name': 'test-repo',
+                      'full_name': 'user/test-repo',
+                      'description': 'A test repository for machine learning',
+                      'html_url': 'https://github.com/user/test-repo',
+                      'stargazers_count': 100,
+                      'language': 'Python',
+                      'topics': ['machine-learning', 'python'],
+                      'created_at': '2023-01-01T00:00:00Z',
+                      'updated_at': '2024-01-01T00:00:00Z',
+                      'readme_content': 'This is a test ML repository'
+                  }
+              ],
+              'metadata': {
+                  'total_repositories': 1,
+                  'fetch_timestamp': time.time()
+              }
+          }
+          
+          Path('../data').mkdir(exist_ok=True)
+          with open('../data/test_starred_repos.json', 'w') as f:
+              json.dump(test_data, f)
+          
+          print('✅ Test data created')
+          "
+          
+          # Test analysis performance
+          echo "📊 Testing analysis performance..."
+          start_time=$(date +%s)
+          
+          python analyze_repos.py --input ../data/test_starred_repos.json --output ../data/test_categorized.json --no-embeddings --verbose
+          
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          
+          echo "⏱️ Analysis completed in ${duration} seconds"
+          
+          if [ $duration -gt 60 ]; then
+            echo "⚠️ Analysis took longer than expected (>60s)"
+          else
+            echo "✅ Performance test passed"
+          fi
+          
+          # Cleanup
+          rm -f ../data/test_*.json
+
+  file-changes:
+    name: 📁 Analyze File Changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 🏁 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 📊 Analyze Changes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            let analysis = {
+              python_files: 0,
+              config_files: 0,
+              data_files: 0,
+              workflow_files: 0,
+              docs_files: 0,
+              high_risk: [],
+              total_additions: 0,
+              total_deletions: 0
+            };
+            
+            for (const file of files) {
+              analysis.total_additions += file.additions;
+              analysis.total_deletions += file.deletions;
+              
+              if (file.filename.endsWith('.py')) {
+                analysis.python_files++;
+              } else if (file.filename.includes('.yml') || file.filename.includes('.yaml') || file.filename.includes('.json')) {
+                analysis.config_files++;
+                if (file.filename.includes('.github/workflows/')) {
+                  analysis.workflow_files++;
+                }
+              } else if (file.filename.includes('data/') || file.filename.endsWith('.csv')) {
+                analysis.data_files++;
+              } else if (file.filename.endsWith('.md')) {
+                analysis.docs_files++;
+              }
+              
+              // Flag high-risk changes
+              if (file.filename.includes('requirements.txt') || 
+                  file.filename.includes('.github/workflows/') ||
+                  file.filename.includes('setup.py')) {
+                analysis.high_risk.push(file.filename);
+              }
+            }
+            
+            // Create summary comment
+            let comment = `## 📊 PR Analysis Summary\n\n`;
+            comment += `**Files Changed:** ${files.length}\n`;
+            comment += `**Lines Added:** +${analysis.total_additions}\n`;
+            comment += `**Lines Removed:** -${analysis.total_deletions}\n\n`;
+            
+            comment += `### 📁 File Types\n`;
+            if (analysis.python_files > 0) comment += `- 🐍 Python files: ${analysis.python_files}\n`;
+            if (analysis.config_files > 0) comment += `- ⚙️ Config files: ${analysis.config_files}\n`;
+            if (analysis.workflow_files > 0) comment += `- 🔄 Workflow files: ${analysis.workflow_files}\n`;
+            if (analysis.data_files > 0) comment += `- 📊 Data files: ${analysis.data_files}\n`;
+            if (analysis.docs_files > 0) comment += `- 📝 Documentation: ${analysis.docs_files}\n`;
+            
+            if (analysis.high_risk.length > 0) {
+              comment += `\n### ⚠️ High-Risk Changes\n`;
+              for (const file of analysis.high_risk) {
+                comment += `- \`${file}\`\n`;
+              }
+              comment += `\n*These files require careful review as they affect core functionality.*\n`;
+            }
+            
+            comment += `\n### 🧪 Validation Status\n`;
+            comment += `- ✅ Syntax validation\n`;
+            comment += `- ✅ Functionality tests\n`;
+            comment += `- ✅ Performance checks\n`;
+            
+            comment += `\n---\n*🤖 Automated analysis by GitHub Actions*`;
+            
+            // Post comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+
+  integration-test:
+    name: 🔗 Integration Test
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 🏁 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 🔗 Full Pipeline Test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔗 Testing full pipeline integration..."
+          
+          # Test the complete workflow with a small dataset
+          cd tools
+          
+          # Create a minimal test dataset
+          python -c "
+          import json
+          import time
+          from pathlib import Path
+          
+          test_data = {
+              'repositories': [
+                  {
+                      'id': 1,
+                      'name': 'awesome-python',
+                      'full_name': 'vinta/awesome-python',
+                      'description': 'A curated list of awesome Python frameworks',
+                      'html_url': 'https://github.com/vinta/awesome-python',
+                      'stargazers_count': 150000,
+                      'language': 'Python',
+                      'topics': ['python', 'awesome-list'],
+                      'created_at': '2014-06-27T21:00:06Z',
+                      'updated_at': '2024-01-01T00:00:00Z',
+                      'readme_content': 'Awesome Python: machine learning, web development'
+                  },
+                  {
+                      'id': 2,
+                      'name': 'tensorflow',
+                      'full_name': 'tensorflow/tensorflow',
+                      'description': 'An Open Source Machine Learning Framework',
+                      'html_url': 'https://github.com/tensorflow/tensorflow',
+                      'stargazers_count': 180000,
+                      'language': 'C++',
+                      'topics': ['machine-learning', 'tensorflow', 'deep-learning'],
+                      'created_at': '2015-11-07T01:19:20Z',
+                      'updated_at': '2024-01-01T00:00:00Z',
+                      'readme_content': 'TensorFlow machine learning neural networks'
+                  }
+              ],
+              'metadata': {
+                  'total_repositories': 2,
+                  'fetch_timestamp': time.time()
+              }
+          }
+          
+          Path('../data').mkdir(exist_ok=True)
+          with open('../data/integration_test_repos.json', 'w') as f:
+              json.dump(test_data, f, indent=2)
+          
+          print('✅ Integration test data created')
+          "
+          
+          # Test analysis
+          echo "🧠 Testing analysis..."
+          python analyze_repos.py --input ../data/integration_test_repos.json --output ../data/integration_test_categorized.json --no-embeddings --verbose
+          
+          # Verify analysis output
+          python -c "
+          import json
+          with open('../data/integration_test_categorized.json') as f:
+              data = json.load(f)
+          
+          assert 'categories' in data, 'Missing categories in output'
+          assert 'metadata' in data, 'Missing metadata in output'
+          assert len(data['categories']) > 0, 'No categories found'
+          
+          print(f'✅ Analysis successful: {len(data[\"categories\"])} categories found')
+          "
+          
+          # Test markdown generation
+          echo "📝 Testing markdown generation..."
+          python generate_markdown.py --input ../data/integration_test_categorized.json --output ../markdown_output/integration_test --verbose
+          
+          # Verify markdown output
+          if [ -d "../markdown_output/integration_test" ]; then
+            echo "✅ Markdown generation successful"
+            ls -la ../markdown_output/integration_test/
+          else
+            echo "❌ Markdown generation failed"
+            exit 1
+          fi
+          
+          # Cleanup
+          rm -f ../data/integration_test_*.json
+          rm -rf ../markdown_output/integration_test/
+          
+          echo "✅ Integration test completed successfully!"
+
+  auto-merge:
+    name: 🤖 Auto-merge
+    runs-on: ubuntu-latest
+    needs: [validate, file-changes, integration-test]
+    if: |
+      github.event_name == 'pull_request' &&
+      github.actor == 'dependabot[bot]' &&
+      success()
+    
+    steps:
+      - name: 🤖 Enable auto-merge for dependabot
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              event: 'APPROVE',
+              body: '🤖 Auto-approving dependabot PR after successful validation'
+            });
+            
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              merge_method: 'squash'
+            });

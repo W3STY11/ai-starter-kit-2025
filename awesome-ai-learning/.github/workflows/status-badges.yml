@@ -1,0 +1,320 @@
+name: 📊 Update Status Badges
+
+on:
+  workflow_run:
+    workflows: ["🔄 Update AI Learning Repository", "✅ Validate Pull Request", "🚀 Manual Repository Update"]
+    types: [completed]
+  schedule:
+    # Update badges daily at 3 AM UTC (after main update)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  update-badges:
+    name: 📊 Update Repository Badges
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🏁 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+      
+      - name: 📊 Generate Status Information
+        id: status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflows = ['update-repository.yml', 'validate-pr.yml', 'manual-update.yml'];
+            const statuses = {};
+            
+            for (const workflow of workflows) {
+              try {
+                const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: workflow,
+                  per_page: 1,
+                  status: 'completed'
+                });
+                
+                if (runs.workflow_runs.length > 0) {
+                  const run = runs.workflow_runs[0];
+                  statuses[workflow] = {
+                    status: run.conclusion,
+                    date: run.updated_at,
+                    url: run.html_url
+                  };
+                } else {
+                  statuses[workflow] = {
+                    status: 'no-runs',
+                    date: new Date().toISOString(),
+                    url: ''
+                  };
+                }
+              } catch (error) {
+                console.log(`Error fetching ${workflow}: ${error.message}`);
+                statuses[workflow] = {
+                  status: 'error',
+                  date: new Date().toISOString(),
+                  url: ''
+                };
+              }
+            }
+            
+            // Get repository statistics
+            let repoStats = {
+              totalRepos: 0,
+              categories: 0,
+              lastUpdate: 'unknown'
+            };
+            
+            try {
+              const fs = require('fs');
+              if (fs.existsSync('data/categorized_repos.json')) {
+                const data = JSON.parse(fs.readFileSync('data/categorized_repos.json', 'utf8'));
+                repoStats = {
+                  totalRepos: data.metadata?.total_repositories || 0,
+                  categories: Object.keys(data.categories || {}).length,
+                  lastUpdate: data.metadata?.analysis_timestamp || 'unknown'
+                };
+              }
+            } catch (error) {
+              console.log(`Error reading repo stats: ${error.message}`);
+            }
+            
+            // Store in outputs
+            core.setOutput('statuses', JSON.stringify(statuses));
+            core.setOutput('repo-stats', JSON.stringify(repoStats));
+            
+            return { statuses, repoStats };
+      
+      - name: 🔄 Update README Badges
+        run: |
+          echo "📊 Updating status badges in README..."
+          
+          # Create or update README with badges if it doesn't exist
+          if [ ! -f "README.md" ]; then
+            cat > README.md << 'EOF'
+          # 🤖 Awesome AI Learning Repository
+          
+          An automatically curated collection of AI and Machine Learning resources from GitHub stars.
+          
+          ## 📊 Repository Status
+          
+          [![Update Repository](https://github.com/${{ github.repository }}/workflows/🔄%20Update%20AI%20Learning%20Repository/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/update-repository.yml)
+          [![Validate PR](https://github.com/${{ github.repository }}/workflows/✅%20Validate%20Pull%20Request/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/validate-pr.yml)
+          [![Manual Update](https://github.com/${{ github.repository }}/workflows/🚀%20Manual%20Repository%20Update/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/manual-update.yml)
+          
+          ## 📈 Statistics
+          
+          <!-- STATS_START -->
+          - **Total Repositories:** Loading...
+          - **Categories:** Loading...
+          - **Last Update:** Loading...
+          <!-- STATS_END -->
+          
+          ## 🚀 Features
+          
+          - **Automated Daily Updates**: Repository automatically updates daily at 2 AM UTC
+          - **Intelligent Categorization**: AI-powered analysis categorizes repositories by functionality
+          - **Manual Controls**: Trigger updates manually with custom parameters
+          - **Quality Assurance**: Comprehensive PR validation and testing
+          - **Performance Optimized**: Fast analysis with optional deep learning modes
+          
+          ## 📁 Repository Structure
+          
+          ```
+          ├── data/                    # Raw and processed data
+          ├── markdown_output/         # Generated markdown files
+          ├── tools/                   # Python analysis tools
+          ├── .github/workflows/       # Automation workflows
+          └── categories/              # Category definitions
+          ```
+          
+          ## 🔧 Manual Usage
+          
+          You can trigger manual updates with custom parameters:
+          1. Go to [Actions](../../actions/workflows/manual-update.yml)
+          2. Click "Run workflow"
+          3. Configure your parameters
+          4. Click "Run workflow"
+          
+          ## 🤝 Contributing
+          
+          This repository is automatically maintained, but contributions are welcome:
+          - Report issues with categorization
+          - Suggest new categories or filters
+          - Improve analysis algorithms
+          
+          ---
+          
+          🤖 This repository is automatically maintained by GitHub Actions.
+          EOF
+          fi
+          
+          # Parse the status information
+          REPO_STATS='${{ steps.status.outputs.repo-stats }}'
+          TOTAL_REPOS=$(echo "$REPO_STATS" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data['totalRepos'])")
+          CATEGORIES=$(echo "$REPO_STATS" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data['categories'])")
+          LAST_UPDATE=$(echo "$REPO_STATS" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data['lastUpdate'])")
+          
+          # Format last update
+          if [ "$LAST_UPDATE" != "unknown" ]; then
+            FORMATTED_DATE=$(date -d "$LAST_UPDATE" "+%Y-%m-%d %H:%M UTC" 2>/dev/null || echo "$LAST_UPDATE")
+          else
+            FORMATTED_DATE="Unknown"
+          fi
+          
+          # Update statistics in README
+          sed -i '/<!-- STATS_START -->/,/<!-- STATS_END -->/c\
+          <!-- STATS_START -->\
+          - **Total Repositories:** '"$TOTAL_REPOS"'\
+          - **Categories:** '"$CATEGORIES"'\
+          - **Last Update:** '"$FORMATTED_DATE"'\
+          <!-- STATS_END -->' README.md
+          
+          echo "✅ README badges updated"
+      
+      - name: 📝 Create Status Report
+        run: |
+          # Create a detailed status report
+          STATUS_FILE="status_report_$(date +%Y%m%d_%H%M).md"
+          
+          cat > "$STATUS_FILE" << 'EOF'
+          # 📊 Repository Status Report
+          
+          Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          
+          ## 🔄 Workflow Status
+          EOF
+          
+          # Parse workflow statuses
+          STATUSES='${{ steps.status.outputs.statuses }}'
+          
+          python3 << PYTHON_SCRIPT >> "$STATUS_FILE"
+          import json
+          
+          statuses = json.loads('$STATUSES')
+          
+          workflow_names = {
+              'update-repository.yml': '🔄 Automated Updates',
+              'validate-pr.yml': '✅ PR Validation', 
+              'manual-update.yml': '🚀 Manual Updates'
+          }
+          
+          for workflow, info in statuses.items():
+              name = workflow_names.get(workflow, workflow)
+              status = info['status']
+              date = info['date']
+              
+              # Format status emoji
+              if status == 'success':
+                  status_emoji = '✅'
+              elif status == 'failure':
+                  status_emoji = '❌'
+              elif status == 'cancelled':
+                  status_emoji = '⚠️'
+              else:
+                  status_emoji = '❓'
+              
+              print(f"- **{name}**: {status_emoji} `{status}` (Last run: {date[:10]})")
+          
+          print("\n## 📈 Repository Statistics")
+          PYTHON_SCRIPT
+          
+          # Add repository statistics
+          REPO_STATS='${{ steps.status.outputs.repo-stats }}'
+          python3 << PYTHON_SCRIPT >> "$STATUS_FILE"
+          import json
+          
+          stats = json.loads('$REPO_STATS')
+          
+          print(f"- **Total Repositories**: {stats['totalRepos']:,}")
+          print(f"- **Categories**: {stats['categories']}")
+          print(f"- **Last Analysis**: {stats['lastUpdate'][:10] if stats['lastUpdate'] != 'unknown' else 'Unknown'}")
+          
+          # Calculate some derived metrics
+          if stats['totalRepos'] > 0 and stats['categories'] > 0:
+              avg_per_category = stats['totalRepos'] / stats['categories']
+              print(f"- **Average Repos per Category**: {avg_per_category:.1f}")
+          PYTHON_SCRIPT
+          
+          cat >> "$STATUS_FILE" << 'EOF'
+          
+          ## 🔗 Quick Links
+          
+          - [🔄 Trigger Manual Update](../../actions/workflows/manual-update.yml)
+          - [📊 View All Workflows](../../actions)
+          - [📁 Browse Categories](../../tree/main/markdown_output)
+          - [📊 Raw Data](../../tree/main/data)
+          
+          ---
+          
+          *This report is automatically generated by the Status Badges workflow.*
+          EOF
+          
+          echo "STATUS_REPORT_FILE=$STATUS_FILE" >> $GITHUB_ENV
+      
+      - name: 🔍 Check for Changes
+        id: check-changes
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changes-detected=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No badge updates needed"
+          else
+            echo "changes-detected=true" >> $GITHUB_OUTPUT
+            echo "✅ Badge updates detected"
+          fi
+      
+      - name: 🚀 Commit Badge Updates
+        if: steps.check-changes.outputs.changes-detected == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add -A
+          git commit -m "📊 Update status badges and statistics
+          
+          - Repository stats updated
+          - Workflow status refreshed
+          - Generated: $(date -u '+%Y-%m-%d %H:%M UTC')
+          
+          🤖 Automated by status-badges workflow"
+          
+          git push origin main
+      
+      - name: 📦 Upload Status Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: status-report-${{ github.run_number }}
+          path: ${{ env.STATUS_REPORT_FILE }}
+          retention-days: 7
+      
+      - name: 📊 Update Job Summary
+        run: |
+          echo "## 📊 Badge Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Changes Detected:** ${{ steps.check-changes.outputs.changes-detected }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add repository statistics
+          REPO_STATS='${{ steps.status.outputs.repo-stats }}'
+          python3 << 'PYTHON_SCRIPT' >> $GITHUB_STEP_SUMMARY
+          import json
+          
+          stats = json.loads('$REPO_STATS')
+          
+          print("### 📈 Current Statistics")
+          print(f"- **Repositories:** {stats['totalRepos']:,}")
+          print(f"- **Categories:** {stats['categories']}")
+          print(f"- **Last Update:** {stats['lastUpdate'][:10] if stats['lastUpdate'] != 'unknown' else 'Unknown'}")
+          PYTHON_SCRIPT

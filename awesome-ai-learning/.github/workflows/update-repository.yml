@@ -1,0 +1,374 @@
+name: 🔄 Update AI Learning Repository
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update even if no changes detected'
+        required: false
+        default: 'false'
+        type: boolean
+      analysis_mode:
+        description: 'Analysis mode'
+        required: false
+        default: 'fast'
+        type: choice
+        options:
+          - fast
+          - full
+      dry_run:
+        description: 'Dry run (no commits)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.9'
+  CACHE_PREFIX: v2
+
+permissions:
+  contents: write
+  actions: read
+  issues: write
+
+jobs:
+  update-repository:
+    name: 🔄 Update Repository Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    outputs:
+      changes-detected: ${{ steps.check-changes.outputs.changes-detected }}
+      total-repos: ${{ steps.stats.outputs.total-repos }}
+      analysis-mode: ${{ steps.setup.outputs.analysis-mode }}
+    
+    steps:
+      - name: 🏁 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: ⚙️ Setup Analysis Parameters
+        id: setup
+        run: |
+          if [ "${{ github.event.inputs.analysis_mode }}" = "" ]; then
+            # Default to fast mode for scheduled runs
+            echo "analysis-mode=fast" >> $GITHUB_OUTPUT
+          else
+            echo "analysis-mode=${{ github.event.inputs.analysis_mode }}" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "dry-run=${{ github.event.inputs.dry_run || 'false' }}" >> $GITHUB_OUTPUT
+          echo "force-update=${{ github.event.inputs.force_update || 'false' }}" >> $GITHUB_OUTPUT
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+            venv/
+          key: ${{ env.CACHE_PREFIX }}-${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements.txt') }}-${{ steps.setup.outputs.analysis-mode }}
+          restore-keys: |
+            ${{ env.CACHE_PREFIX }}-${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-
+            ${{ env.CACHE_PREFIX }}-${{ runner.os }}-python-
+      
+      - name: 🛠️ Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Verify critical imports
+          python -c "
+          import github, pandas, numpy, sklearn, tqdm, click
+          print('✅ All required packages imported successfully')
+          "
+      
+      - name: 🌟 Fetch Starred Repositories
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Fetching starred repositories..."
+          cd tools
+          
+          # Run with verbose output and error handling
+          python fetch_stars.py --verbose --output ../data/starred_repos_latest.json 2>&1 | tee fetch.log
+          
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to fetch starred repositories"
+            cat fetch.log
+            exit 1
+          fi
+          
+          # Validate output
+          if [ ! -f "../data/starred_repos_latest.json" ]; then
+            echo "::error::Output file not created"
+            exit 1
+          fi
+          
+          # Basic validation
+          python -c "
+          import json
+          with open('../data/starred_repos_latest.json') as f:
+              data = json.load(f)
+          print(f'✅ Fetched {len(data.get(\"repositories\", []))} repositories')
+          if len(data.get('repositories', [])) == 0:
+              raise ValueError('No repositories found')
+          "
+      
+      - name: 🧠 Analyze Repositories
+        run: |
+          echo "🔍 Analyzing repositories..."
+          cd tools
+          
+          # Choose analysis mode
+          if [ "${{ steps.setup.outputs.analysis-mode }}" = "full" ]; then
+            echo "🧠 Running full analysis with embeddings..."
+            python analyze_repos.py --verbose 2>&1 | tee analyze.log
+          else
+            echo "🏃 Running fast analysis (rule-based only)..."
+            python analyze_repos.py --no-embeddings --verbose 2>&1 | tee analyze.log
+          fi
+          
+          if [ $? -ne 0 ]; then
+            echo "::error::Analysis failed"
+            cat analyze.log
+            exit 1
+          fi
+          
+          # Validate analysis output
+          if [ ! -f "../data/categorized_repos.json" ]; then
+            echo "::error::Analysis output file not created"
+            exit 1
+          fi
+      
+      - name: 📝 Generate Markdown
+        run: |
+          echo "📝 Generating markdown files..."
+          cd tools
+          
+          python generate_markdown.py --verbose 2>&1 | tee generate.log
+          
+          if [ $? -ne 0 ]; then
+            echo "::error::Markdown generation failed"
+            cat generate.log
+            exit 1
+          fi
+      
+      - name: 📊 Extract Statistics
+        id: stats
+        run: |
+          cd tools
+          
+          # Extract key statistics
+          STATS=$(python -c "
+          import json, sys
+          try:
+              with open('../data/categorized_repos.json') as f:
+                  data = json.load(f)
+              metadata = data.get('metadata', {})
+              print(f'total-repos={metadata.get(\"total_repositories\", 0)}')
+              print(f'categories={len(data.get(\"categories\", {}))}')
+              print(f'analysis-timestamp={metadata.get(\"analysis_timestamp\", \"unknown\")}')
+          except Exception as e:
+              print(f'Error extracting stats: {e}', file=sys.stderr)
+              sys.exit(1)
+          ")
+          
+          echo "$STATS" >> $GITHUB_OUTPUT
+          
+          # Create summary for logs
+          echo "📊 Repository Statistics:" >> $GITHUB_STEP_SUMMARY
+          echo "$STATS" | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+      
+      - name: 🔍 Check for Changes
+        id: check-changes
+        run: |
+          # Check if there are any changes to commit
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "changes-detected=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes detected"
+          else
+            echo "changes-detected=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected"
+            
+            # Show what changed
+            echo "📝 Changed files:" >> $GITHUB_STEP_SUMMARY
+            git diff --name-only >> $GITHUB_STEP_SUMMARY
+            git diff --cached --name-only >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: 🚀 Commit and Push Changes
+        if: steps.check-changes.outputs.changes-detected == 'true' && steps.setup.outputs.dry-run == 'false'
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Stage all changes
+          git add -A
+          
+          # Create commit message with details
+          COMMIT_MSG="🔄 Automated repository update - $(date -u '+%Y-%m-%d %H:%M UTC')
+          
+          📊 Analysis Summary:
+          - Total repositories: ${{ steps.stats.outputs.total-repos }}
+          - Analysis mode: ${{ steps.setup.outputs.analysis-mode }}
+          - Workflow: ${{ github.workflow }}
+          - Run ID: ${{ github.run_id }}
+          
+          🤖 Automated by GitHub Actions"
+          
+          # Commit changes
+          git commit -m "$COMMIT_MSG"
+          
+          # Push changes with retry logic
+          max_retries=3
+          retry_count=0
+          
+          while [ $retry_count -lt $max_retries ]; do
+            if git push origin main; then
+              echo "✅ Successfully pushed changes"
+              break
+            else
+              retry_count=$((retry_count + 1))
+              if [ $retry_count -lt $max_retries ]; then
+                echo "⚠️ Push failed, retrying in 5 seconds... (attempt $retry_count/$max_retries)"
+                sleep 5
+                git pull --rebase origin main
+              else
+                echo "::error::Failed to push after $max_retries attempts"
+                exit 1
+              fi
+            fi
+          done
+      
+      - name: 📊 Update Summary
+        if: always()
+        run: |
+          echo "## 🔄 Repository Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Analysis Mode:** ${{ steps.setup.outputs.analysis-mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Changes Detected:** ${{ steps.check-changes.outputs.changes-detected }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Repositories:** ${{ steps.stats.outputs.total-repos }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ steps.setup.outputs.dry-run }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check-changes.outputs.changes-detected }}" = "true" ] && [ "${{ steps.setup.outputs.dry-run }}" = "false" ]; then
+            echo "✅ Repository successfully updated with latest data" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.check-changes.outputs.changes-detected }}" = "true" ] && [ "${{ steps.setup.outputs.dry-run }}" = "true" ]; then
+            echo "🔍 Dry run completed - changes would be committed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No changes detected - repository is up to date" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  notify:
+    name: 📢 Send Notifications
+    runs-on: ubuntu-latest
+    needs: [update-repository]
+    if: always() && (failure() || needs.update-repository.outputs.changes-detected == 'true')
+    
+    steps:
+      - name: 📢 Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🚨 Repository Update Failed - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            ## ❌ Automated Repository Update Failed
+            
+            **Workflow:** ${context.workflow}
+            **Run ID:** ${context.runId}
+            **Trigger:** ${context.eventName}
+            **Timestamp:** ${new Date().toISOString()}
+            
+            ### Failure Details
+            - **Analysis Mode:** ${{ needs.update-repository.outputs.analysis-mode || 'unknown' }}
+            - **Repository Count:** ${{ needs.update-repository.outputs.total-repos || 'unknown' }}
+            
+            ### Action Required
+            Please check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for detailed error information.
+            
+            ### Quick Fix Commands
+            \`\`\`bash
+            # Run locally to debug
+            cd tools
+            python fetch_stars.py --verbose
+            python analyze_repos.py --no-embeddings --verbose
+            python generate_markdown.py --verbose
+            \`\`\`
+            
+            ---
+            🤖 This issue was created automatically by GitHub Actions.
+            `;
+            
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['automated-update', 'bug'],
+              state: 'open'
+            });
+            
+            // Close old failure issues
+            for (const issue of issues) {
+              if (issue.title.includes('Repository Update Failed')) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed'
+                });
+              }
+            }
+            
+            // Create new issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['automated-update', 'bug', 'priority-high']
+            });
+      
+      - name: 🎉 Create Success Comment
+        if: needs.update-repository.outputs.changes-detected == 'true' && success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Close any open failure issues
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['automated-update', 'bug'],
+              state: 'open'
+            });
+            
+            for (const issue of issues) {
+              if (issue.title.includes('Repository Update Failed')) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `✅ Repository update is now working again!\n\n**Latest successful run:** ${context.payload.repository.html_url}/actions/runs/${context.runId}`
+                });
+                
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed'
+                });
+              }
+            }

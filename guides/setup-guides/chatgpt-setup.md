@@ -33,8 +33,8 @@ Get started with ChatGPT in just a few minutes! This guide walks you through eve
 3. Complete your profile (optional but recommended)
 
 ### Step 4: Choose Your Plan
-- **Free**: Perfect for beginners, includes GPT-3.5
-- **Plus ($20/month)**: GPT-4, faster responses, priority access
+- **Free**: Perfect for beginners, includes GPT-4o mini
+- **Plus ($20/month)**: GPT-4.1, GPT-4o, faster responses, priority access
 
 > **Recommendation**: Start with the free plan and upgrade later if needed.
 
@@ -96,7 +96,7 @@ Explain photosynthesis like I'm 10 years old.
 - **Settings**: Account and privacy settings
 
 ### Advanced Features (Plus Users)
-- **GPT-4**: More capable AI model
+- **GPT-4.1 & GPT-4o**: Latest, most capable AI models
 - **Web Browsing**: Access current information
 - **Image Upload**: Analyze pictures and documents
 - **Voice Chat**: Speak with ChatGPT

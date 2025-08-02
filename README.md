@@ -2,7 +2,7 @@
 
 > **The Ultimate AI Learning Hub for Complete Beginners**  
 > Curated from the most respected and verified AI resources across the internet  
-> **Created by Nicholas Westburg**
+> **The Ultimate Resource Collection for AI Beginners**
 
 [![GitHub stars](https://img.shields.io/github/stars/W3STY11/ai-starter-kit-2025?style=social)](https://github.com/W3STY11/ai-starter-kit-2025/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/W3STY11/ai-starter-kit-2025?style=social)](https://github.com/W3STY11/ai-starter-kit-2025/network/members)
@@ -163,7 +163,7 @@ No jargon, clear explanations, and progressive complexity
 ## 🔄 Recent Updates
 
 **August 2025**
-- ✨ Added Claude 3.5 Sonnet guides and examples
+- ✨ Added Claude 4 (Sonnet & Opus) guides and examples
 - 🆕 New no-code AI workflow tutorials
 - 📱 Mobile-optimized learning paths
 - 🔗 Updated all external links (100% working)
