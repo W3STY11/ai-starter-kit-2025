@@ -14,9 +14,9 @@ Found an amazing AI resource? We'd love to add it!
 - Practical, actionable content
 
 **How to suggest:**
-1. [Create a Resource Suggestion Issue](https://github.com/username/ai-starter-kit-2025/issues/new?template=resource_suggestion.md)
+1. [Create a Resource Suggestion Issue](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=resource_suggestion.md)
 2. Fill out the template with resource details
-3. We'll review and add it if it meets our criteria
+3. I'll review and add it if it meets our criteria
 
 ### 2. Improve Existing Content
 - Fix typos or broken links
@@ -63,13 +63,13 @@ All resources must meet these standards:
 ## 🔧 How to Contribute
 
 ### Option 1: GitHub Issues (Easiest)
-1. Go to [Issues](https://github.com/username/ai-starter-kit-2025/issues)
+1. Go to [Issues](https://github.com/W3STY11/ai-starter-kit-2025/issues)
 2. Choose the appropriate template:
-   - 🆕 [Resource Suggestion](https://github.com/username/ai-starter-kit-2025/issues/new?template=resource_suggestion.md)
-   - 🐛 [Bug Report](https://github.com/username/ai-starter-kit-2025/issues/new?template=bug_report.md)
-   - 💡 [Feature Request](https://github.com/username/ai-starter-kit-2025/issues/new?template=feature_request.md)
+   - 🆕 [Resource Suggestion](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=resource_suggestion.md)
+   - 🐛 [Bug Report](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=bug_report.md)
+   - 💡 [Feature Request](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=feature_request.md)
 3. Fill out the template completely
-4. Submit and we'll review!
+4. Submit and I'll review!
 
 ### Option 2: Pull Requests (For Direct Changes)
 1. **Fork** this repository
@@ -143,19 +143,18 @@ All contributors are recognized in our [Contributors](./CONTRIBUTORS.md) file.
 ### New to GitHub?
 1. [Create a GitHub account](https://github.com/join)
 2. Read [GitHub's Hello World guide](https://guides.github.com/activities/hello-world/)
-3. Start with [suggesting a resource](https://github.com/username/ai-starter-kit-2025/issues/new?template=resource_suggestion.md)
+3. Start with [suggesting a resource](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=resource_suggestion.md)
 
 ### New to AI?
 1. Explore our [learning paths](./learning-paths/)
 2. Try the [Top 10 Starter Pack](./resources/top-10-starter-pack.md)
-3. Join our [community discussions](https://github.com/username/ai-starter-kit-2025/discussions)
+3. Join our [community discussions](https://github.com/W3STY11/ai-starter-kit-2025/discussions)
 
 ## 📞 Questions?
 
 ### Get Help
-- 💬 [GitHub Discussions](https://github.com/username/ai-starter-kit-2025/discussions) - Community Q&A
-- 📧 [Email maintainers](mailto:contact@ai-starter-kit.com) - Direct support
-- 🐛 [Report issues](https://github.com/username/ai-starter-kit-2025/issues) - Bug reports
+- 💬 [GitHub Discussions](https://github.com/W3STY11/ai-starter-kit-2025/discussions) - Community Q&A
+- 🐛 [Report issues](https://github.com/W3STY11/ai-starter-kit-2025/issues) - Bug reports
 
 ### Community Guidelines
 - Be respectful and inclusive
@@ -171,7 +170,7 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 **Ready to contribute?** 🚀
 
-Start by [suggesting a resource](https://github.com/username/ai-starter-kit-2025/issues/new?template=resource_suggestion.md) or [browse open issues](https://github.com/username/ai-starter-kit-2025/issues) to see how you can help!
+Start by [suggesting a resource](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=resource_suggestion.md) or [browse open issues](https://github.com/W3STY11/ai-starter-kit-2025/issues) to see how you can help!
 
 **Thank you for making AI more accessible to everyone!** ❤️
 

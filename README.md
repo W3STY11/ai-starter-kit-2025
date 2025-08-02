@@ -4,11 +4,10 @@
 > Curated from the most respected and verified AI resources across the internet  
 > **Created by Nicholas Westburg**
 
-[![GitHub stars](https://img.shields.io/github/stars/username/ai-starter-kit-2025?style=social)](https://github.com/username/ai-starter-kit-2025/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/username/ai-starter-kit-2025?style=social)](https://github.com/username/ai-starter-kit-2025/network/members)
+[![GitHub stars](https://img.shields.io/github/stars/W3STY11/ai-starter-kit-2025?style=social)](https://github.com/W3STY11/ai-starter-kit-2025/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/W3STY11/ai-starter-kit-2025?style=social)](https://github.com/W3STY11/ai-starter-kit-2025/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Last Updated](https://img.shields.io/badge/Last%20Updated-August%202025-brightgreen.svg)](https://github.com/username/ai-starter-kit-2025/commits/main)
-[![Premium Research](https://img.shields.io/badge/Premium%20Research-1000%2B%20Sources-gold.svg)](https://github.com/username/ai-starter-kit-2025)
+[![Last Updated](https://img.shields.io/badge/Last%20Updated-August%202025-brightgreen.svg)](https://github.com/W3STY11/ai-starter-kit-2025/commits/main)
 
 ---
 
@@ -141,14 +140,13 @@ No jargon, clear explanations, and progressive complexity
 ## 🤝 Community & Support
 
 ### Get Help
-- 💬 [Join our Discord](https://discord.gg/ai-starter-kit) for real-time help
-- 🐛 [Report issues](https://github.com/username/ai-starter-kit-2025/issues) or suggest improvements
-- 📧 [Contact maintainers](mailto:contact@ai-starter-kit.com) for direct support
+- 🐛 [Report issues](https://github.com/W3STY11/ai-starter-kit-2025/issues) or suggest improvements
+- 💬 [Start a discussion](https://github.com/W3STY11/ai-starter-kit-2025/discussions) for questions and ideas
 
 ### Contribute
-- 🌟 [Star this repository](https://github.com/username/ai-starter-kit-2025/stargazers) to show support
+- 🌟 [Star this repository](https://github.com/W3STY11/ai-starter-kit-2025/stargazers) to show support
 - 🍴 [Fork and contribute](./CONTRIBUTING.md) new resources or improvements
-- 📝 [Suggest resources](https://github.com/username/ai-starter-kit-2025/issues/new?template=resource_suggestion.md) you've found helpful
+- 📝 [Suggest resources](https://github.com/W3STY11/ai-starter-kit-2025/issues/new?template=resource_suggestion.md) you've found helpful
 
 ---
 
@@ -158,7 +156,7 @@ No jargon, clear explanations, and progressive complexity
 - **4 Learning Paths**: Tailored for different backgrounds and goals
 - **100+ Practical Examples**: Ready-to-use prompts and workflows
 - **Weekly Updates**: Fresh content and link validation
-- **Community Driven**: Built with feedback from 1000+ users
+- **Community Driven**: Open to feedback and contributions
 
 ---
 
@@ -188,7 +186,7 @@ This repository is licensed under the [MIT License](./LICENSE). Feel free to use
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=username/ai-starter-kit-2025&type=Date)](https://star-history.com/#username/ai-starter-kit-2025&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=W3STY11/ai-starter-kit-2025&type=Date)](https://star-history.com/#W3STY11/ai-starter-kit-2025&Date)
 
 ---
 
