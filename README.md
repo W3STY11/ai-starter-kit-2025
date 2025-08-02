@@ -183,9 +183,6 @@ No jargon, clear explanations, and progressive complexity
 
 This repository is licensed under the [MIT License](./LICENSE). Feel free to use, modify, and share.
 
-**Created by**: [Manus AI](https://manus.ai) Research Team  
-**Maintained by**: AI Education Community  
-**Last Updated**: August 2025
 
 ---
 
